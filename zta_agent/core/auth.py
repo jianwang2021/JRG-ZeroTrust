@@ -8,7 +8,6 @@ from typing import Dict, Optional, Tuple, List
 import secrets
 import bcrypt
 import base64
-import hmac
 from .credential_store import CredentialStore
 from .token_store import TokenStore
 from .password_policy import PasswordPolicy
@@ -59,7 +58,7 @@ class AuthenticationManager:
             self.auth_providers["certificate"] = CertificateProvider(config["certificate"])
 
         # Password-based auth is always available
-        self.auth_providers["password"] = self
+        self.auth_providers["password"] = self._password_authenticate
 
     def authenticate(self, credentials: Dict) -> Optional[Dict]:
         """
@@ -69,6 +68,9 @@ class AuthenticationManager:
             credentials: Dictionary containing:
                 - provider: Authentication provider to use
                 - Other provider-specific credentials
+        
+        Returns:
+            Optional[Dict]: Authentication result with tokens if successful, None otherwise
         """
         provider_name = credentials.get("provider", "password")
         provider = self.auth_providers.get(provider_name)
@@ -302,22 +304,16 @@ class AuthenticationManager:
         """Record a failed authentication attempt."""
         self.credential_store.record_failed_attempt(identity)
 
-    def validate_credentials(self, credentials: Dict) -> Tuple[bool, str]:
-        """Validate credentials format for password-based authentication."""
-        identity = credentials.get("identity")
-        password = credentials.get("secret")
-        ip_address = credentials.get("ip_address")
-        user_agent = credentials.get("user_agent")
-
-        if not identity or not password:
-            return False, "Missing identity or password"
-
-        return True, ""
-
-    def authenticate(self, credentials: Dict) -> Optional[Dict]:
+    def _password_authenticate(self, credentials: Dict) -> Optional[Dict]:
         """
-        Authenticate an entity and return tokens if successful.
+        Password-based authentication handler.
         Returns both access and refresh tokens.
+        
+        Args:
+            credentials: Dictionary containing identity and secret (password)
+            
+        Returns:
+            Optional[Dict]: Authentication result with tokens if successful, None otherwise
         """
         identity = credentials.get("identity")
         password = credentials.get("secret")
@@ -343,20 +339,23 @@ class AuthenticationManager:
             refresh_token = self.generate_token(identity, "refresh")
 
             self.security_logger.log_authentication_attempt(
-                identity, True, ip_address, user_agent
+                identity, True, ip_address, user_agent,
+                details={"provider": "password"}
             )
 
             return {
                 "access_token": access_token,
                 "refresh_token": refresh_token,
                 "token_type": "bearer",
-                "expires_in": self.token_expiry
+                "expires_in": self.token_expiry,
+                "identity": identity
             }
         
         # Record failed attempt
         self.record_failed_attempt(identity)
         self.security_logger.log_authentication_attempt(
-            identity, False, ip_address, user_agent
+            identity, False, ip_address, user_agent,
+            details={"provider": "password"}
         )
         return None
 
