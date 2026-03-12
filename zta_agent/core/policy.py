@@ -2,24 +2,24 @@
 Policy Engine for Zero Trust Security Agent
 """
 
-from typing import Dict, List, Any
-from dataclasses import dataclass
+from typing import Dict, List, Any, Optional
+from dataclasses import dataclass, field
 import re
 
 @dataclass
 class Policy:
     name: str
-    conditions: Dict
+    conditions: Dict[str, Any]
     effect: str
-    priority: int
+    priority: int = 0
 
 class PolicyEngine:
     def __init__(self, config: Dict):
-        self.policies = self._load_policies(config)
+        self.policies: List[Policy] = []
+        self._load_policies(config)
 
-    def _load_policies(self, config: Dict) -> List[Policy]:
+    def _load_policies(self, config: Dict) -> None:
         """Load policies from configuration."""
-        policies = []
         for policy_config in config.get("policies", []):
             policy = Policy(
                 name=policy_config["name"],
@@ -27,13 +27,14 @@ class PolicyEngine:
                 effect=policy_config["effect"],
                 priority=policy_config.get("priority", 0)
             )
-            policies.append(policy)
-        return sorted(policies, key=lambda x: x.priority, reverse=True)
+            self.policies.append(policy)
+        
+        self.policies.sort(key=lambda x: x.priority, reverse=True)
 
     def evaluate(self, context: Dict[str, Any]) -> bool:
         """Evaluate policies against the given context."""
         for policy in self.policies:
-            if self._matches_conditions(policy.conditions, context):
+            if self._matches_conditions(context, policy.conditions):
                 return policy.effect.lower() == "allow"
         return False  # Default deny if no policy matches
 
@@ -48,7 +49,7 @@ class PolicyEngine:
                 return None
         return value
 
-    def _matches_conditions(self, conditions: Dict, context: Dict) -> bool:
+    def _matches_conditions(self, context: Dict, conditions: Dict) -> bool:
         """Check if context matches policy conditions."""
         for key, condition in conditions.items():
             context_value = self._get_nested_value(context, key)
@@ -87,8 +88,19 @@ class PolicyEngine:
 
         return operators[operator](actual_value, expected_value)
 
-    def add_policy(self, policy: Policy) -> None:
-        """Add a new policy to the engine."""
+    def add_policy(self, policy) -> None:
+        """Add a new policy to the engine.
+        
+        Args:
+            policy: Either a Policy object or a dict with policy configuration
+        """
+        if isinstance(policy, dict):
+            policy = Policy(
+                name=policy["name"],
+                conditions=policy["conditions"],
+                effect=policy["effect"],
+                priority=policy.get("priority", 0)
+            )
         self.policies.append(policy)
         self.policies.sort(key=lambda x: x.priority, reverse=True)
 
