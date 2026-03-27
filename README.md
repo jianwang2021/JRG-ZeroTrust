@@ -1,5 +1,4 @@
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/kenhuangus/ZeroTrustAgent)
-
 # Zero Trust Agent (ZTA) Framework for Multi-Agent Collaboration
 
 **`zta-agent`** is a Python package designed to implement a Zero Trust security framework for multi-agent systems. It addresses the critical need for secure and controlled interactions in environments where multiple autonomous agents collaborate. This is particularly relevant for systems built using popular AI frameworks like CrewAI, AutoGen, OpenAI Agents, LangGraph, and more.
